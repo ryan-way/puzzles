@@ -214,12 +214,12 @@ impl<'a> WordSuggestor<'a> {
         }
 
         println!("Calculating suggestion");
-        // let progress_bar = ProgressBar::new(self.word_bank.len() as u64);
+        let progress_bar = ProgressBar::new(self.word_bank.len() as u64);
         let suggestion = self
             .word_bank
             .iter()
             .max_by_key(|&word| {
-                // progress_bar.inc(1);
+                progress_bar.inc(1);
                 ranker.rank(&possible_solutions, word)
             })
             .unwrap()
@@ -236,7 +236,7 @@ impl<'a> WordSuggestor<'a> {
     }
 }
 
-trait Ranker: Sync + Send {
+pub trait Ranker: Sync + Send {
     fn rank(&self, possible_solutions: &Vec<&String>, word: &String) -> usize;
 }
 
@@ -317,7 +317,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "Suggestion: {}",
-        word_suggestor.suggest_word(LargestUniqueValuesRanker::new())
+        word_suggestor.suggest_word(LowestMaxBucketRanker::new())
     );
 
     Ok(())
