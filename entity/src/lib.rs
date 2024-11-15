@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate dotenv_codegen;
 
-mod entities;
 mod connection;
+mod entities;
 
-pub use entities::*;
 pub use connection::*;
+pub use entities::*;

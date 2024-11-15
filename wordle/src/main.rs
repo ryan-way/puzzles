@@ -2,23 +2,22 @@
 #![feature(iter_array_chunks)]
 
 extern crate entity;
-extern crate test;
 extern crate rayon;
+extern crate test;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str::FromStr;
 use std::usize;
 
-use entity::word;
 use entity::prelude::*;
-use rayon::prelude::*;
+use entity::word;
 use indicatif::ProgressBar;
+use rayon::prelude::*;
 use sea_orm::prelude::Expr;
 use sea_orm::sea_query::ExprTrait;
 use sea_orm::sea_query::Func;
 use sea_orm::{EntityTrait, QueryFilter};
-
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Color {
@@ -34,15 +33,21 @@ pub struct Clues([Color; 5]);
 impl FromStr for Clues {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Clues(s.chars()
-            .array_chunks::<5>()
-            .take(1)
-            .map(|window: [char; 5]| window.map(|c| match c {
-                'b' => Color::BLACK,
-                'y' => Color::YELLOW,
-                'g' => Color::GREEN,
-                _ => panic!("Unsupported color {}", c)
-        })).next().unwrap()))
+        Ok(Clues(
+            s.chars()
+                .array_chunks::<5>()
+                .take(1)
+                .map(|window: [char; 5]| {
+                    window.map(|c| match c {
+                        'b' => Color::BLACK,
+                        'y' => Color::YELLOW,
+                        'g' => Color::GREEN,
+                        _ => panic!("Unsupported color {}", c),
+                    })
+                })
+                .next()
+                .unwrap(),
+        ))
     }
 }
 
@@ -99,9 +104,7 @@ impl WordProcessor {
             map.entry(c).or_default().add(idx);
         });
 
-        WordProcessor {
-            map,
-        }
+        WordProcessor { map }
     }
 
     fn get(&self, c: char) -> Option<&Bitmask> {
@@ -120,10 +123,7 @@ pub struct WordClues<'a> {
 
 impl<'a> WordClues<'a> {
     fn from_clues(word: &'a String, clues: Clues) -> Self {
-        WordClues {
-            word,
-            clues,
-        }
+        WordClues { word, clues }
     }
 
     fn from_solution(word: &'a String, solution: &String) -> Self {
@@ -134,22 +134,28 @@ impl<'a> WordClues<'a> {
 
         word_processor.entries().for_each(|(&key, word_set)| {
             if let Some(solution_set) = solution_processor.get(key) {
-                word_set.intersection(solution_set).values().for_each(|value| {
-                    map.insert(value, Color::GREEN);
-                });
+                word_set
+                    .intersection(solution_set)
+                    .values()
+                    .for_each(|value| {
+                        map.insert(value, Color::GREEN);
+                    });
 
-                let max_yellows = solution_set.values().filter(|&value| !word_set.has(value)).count();
-                let yellows: Vec<usize> = word_set.values()
+                let max_yellows = solution_set
+                    .values()
+                    .filter(|&value| !word_set.has(value))
+                    .count();
+                let yellows: Vec<usize> = word_set
+                    .values()
                     .filter(|value| !map.contains_key(value))
                     .take(max_yellows)
                     .collect();
-                yellows.iter()
-                    .for_each(|&value| {
+                yellows.iter().for_each(|&value| {
                     map.insert(value, Color::YELLOW);
                 })
             }
         });
-        
+
         let mut colors: [Color; 5] = [Color::BLACK; 5];
 
         map.iter().for_each(|(&key, &value)| {
@@ -157,10 +163,7 @@ impl<'a> WordClues<'a> {
         });
         let clues = Clues(colors);
 
-        WordClues {
-            clues,
-            word,
-        }
+        WordClues { clues, word }
     }
 
     fn get_colors(&self) -> &Clues {
@@ -174,24 +177,30 @@ impl<'a> Into<Clues> for WordClues<'a> {
     }
 }
 
-
 pub struct WordSuggestor<'a> {
     word_bank: Vec<String>,
     word_clues: Vec<WordClues<'a>>,
 }
 
-
 impl<'a> WordSuggestor<'a> {
     pub fn new(word_bank: Vec<String>) -> Self {
-        WordSuggestor { word_bank, word_clues: vec![] }
+        WordSuggestor {
+            word_bank,
+            word_clues: vec![],
+        }
     }
-    pub fn suggest_word<T>(&self, ranker: T) -> String where T: Ranker{
+    pub fn suggest_word<T>(&self, ranker: T) -> String
+    where
+        T: Ranker,
+    {
         println!("Calculating possible solutions");
-        let possible_solutions: Vec<&String> = self.word_bank.iter()
-            .filter(|solution|{
-                self.word_clues.iter().all(|clue| 
+        let possible_solutions: Vec<&String> = self
+            .word_bank
+            .iter()
+            .filter(|solution| {
+                self.word_clues.iter().all(|clue| {
                     WordClues::from_solution(clue.word, solution).get_colors() == clue.get_colors()
-                )
+                })
             })
             .collect();
         println!("Number of possible solutions: {}", possible_solutions.len());
@@ -206,12 +215,16 @@ impl<'a> WordSuggestor<'a> {
 
         println!("Calculating suggestion");
         // let progress_bar = ProgressBar::new(self.word_bank.len() as u64);
-        let suggestion = self.word_bank.iter().max_by_key(|&word| {
-            // progress_bar.inc(1);
-            ranker.rank(&possible_solutions, word)
-        }).unwrap()
-        .to_owned()
-        .to_owned();
+        let suggestion = self
+            .word_bank
+            .iter()
+            .max_by_key(|&word| {
+                // progress_bar.inc(1);
+                ranker.rank(&possible_solutions, word)
+            })
+            .unwrap()
+            .to_owned()
+            .to_owned();
 
         // let score = ranker.rank(&possible_solutions, &suggestion);
         // println!("Suggestion {}, score: {}", suggestion, score);
@@ -222,7 +235,6 @@ impl<'a> WordSuggestor<'a> {
         self.word_clues.push(word_clue);
     }
 }
-
 
 trait Ranker: Sync + Send {
     fn rank(&self, possible_solutions: &Vec<&String>, word: &String) -> usize;
@@ -239,15 +251,17 @@ impl LowestMaxBucketRanker {
 impl Ranker for LowestMaxBucketRanker {
     fn rank(&self, possible_solutions: &Vec<&String>, word: &String) -> usize {
         let mut map = HashMap::<Clues, usize>::new();
-        possible_solutions.len() - *possible_solutions.iter()
-            .map(|solution| WordClues::from_solution(word, solution).into())
-            .fold(&mut map, |acc, value| {
-                *acc.entry(value).or_default() += 1;
-                acc
-            })
-            .values()
-            .max()
-            .unwrap()
+        possible_solutions.len()
+            - *possible_solutions
+                .iter()
+                .map(|solution| WordClues::from_solution(word, solution).into())
+                .fold(&mut map, |acc, value| {
+                    *acc.entry(value).or_default() += 1;
+                    acc
+                })
+                .values()
+                .max()
+                .unwrap()
     }
 }
 
@@ -261,14 +275,15 @@ impl LargestUniqueValuesRanker {
 
 impl Ranker for LargestUniqueValuesRanker {
     fn rank(&self, possible_solutions: &Vec<&String>, word: &String) -> usize {
-        possible_solutions.iter()
+        possible_solutions
+            .iter()
             .map(|solution| WordClues::from_solution(word, solution).into())
             .collect::<HashSet<Clues>>()
-            .len() 
+            .len()
     }
 }
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>>{
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let db = entity::get_connection().await?;
 
     // let models = Word::find()
@@ -282,9 +297,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     //     .collect::<Vec<String>>();
 
     let words: Vec<String> = include_str!("word_bank.txt")
-    .lines()
-    .map(|s| s.to_owned())
-    .collect();
+        .lines()
+        .map(|s| s.to_owned())
+        .collect();
 
     println!("created word bank");
     let mut word_suggestor = WordSuggestor::new(words);
@@ -300,7 +315,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
         word_suggestor.add_clue(WordClues::from_clues(&word, clues));
     }
 
-    println!("Suggestion: {}", word_suggestor.suggest_word(LargestUniqueValuesRanker::new()));
+    println!(
+        "Suggestion: {}",
+        word_suggestor.suggest_word(LargestUniqueValuesRanker::new())
+    );
 
     Ok(())
 }
@@ -368,7 +386,6 @@ mod tests {
             mask.add(3);
             mask.add(8);
 
-
             let values: Vec<usize> = mask.values().collect();
             println!("Values: {:?}", values);
             assert!(values.contains(&3));
@@ -420,22 +437,142 @@ mod tests {
 
     #[test]
     fn test_colors() {
-        assert_eq!(*WordClues::from_solution(&"saber".to_owned(), &"label".to_owned()).get_colors(), Clues([Color::BLACK, Color::GREEN, Color::GREEN, Color::GREEN, Color::BLACK]));
-        assert_eq!(*WordClues::from_solution(&"aheap".to_owned(), &"woken".to_owned()).get_colors(), Clues([Color::BLACK, Color::BLACK, Color::YELLOW, Color::BLACK, Color::BLACK]));
-    
-        assert_eq!(*WordClues::from_solution(&"serai".to_owned(), &"delve".to_owned()).get_colors(), Clues([Color::BLACK, Color::GREEN, Color::BLACK, Color::BLACK, Color::BLACK]));
-        assert_eq!(*WordClues::from_solution(&"yente".to_owned(), &"delve".to_owned()).get_colors(), Clues([Color::BLACK, Color::GREEN, Color::BLACK, Color::BLACK, Color::GREEN]));
-        assert_eq!(*WordClues::from_solution(&"blech".to_owned(), &"delve".to_owned()).get_colors(), Clues([Color::BLACK, Color::YELLOW, Color::YELLOW, Color::BLACK, Color::BLACK]));
-        assert_eq!(*WordClues::from_solution(&"begem".to_owned(), &"delve".to_owned()).get_colors(), Clues([Color::BLACK, Color::GREEN, Color::BLACK, Color::YELLOW, Color::BLACK]));
-        assert_eq!(*WordClues::from_solution(&"welke".to_owned(), &"delve".to_owned()).get_colors(), Clues([Color::BLACK, Color::GREEN, Color::GREEN, Color::BLACK, Color::GREEN]));
-        assert_eq!(*WordClues::from_solution(&"mommy".to_owned(), &"delve".to_owned()).get_colors(), Clues([Color::BLACK, Color::BLACK, Color::BLACK, Color::BLACK, Color::BLACK]));
+        assert_eq!(
+            *WordClues::from_solution(&"saber".to_owned(), &"label".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::GREEN,
+                Color::GREEN,
+                Color::GREEN,
+                Color::BLACK
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"aheap".to_owned(), &"woken".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::BLACK,
+                Color::YELLOW,
+                Color::BLACK,
+                Color::BLACK
+            ])
+        );
 
-        assert_eq!(*WordClues::from_solution(&"forge".to_owned(), &"forge".to_owned()).get_colors(), Clues([Color::GREEN; 5]));
-        assert_eq!(*WordClues::from_solution(&"forte".to_owned(), &"forge".to_owned()).get_colors(), Clues([Color::GREEN, Color::GREEN, Color::GREEN, Color::BLACK, Color::GREEN]));
-        assert_eq!(*WordClues::from_solution(&"forze".to_owned(), &"forge".to_owned()).get_colors(), Clues([Color::GREEN, Color::GREEN, Color::GREEN, Color::BLACK, Color::GREEN]));
-        assert_eq!(*WordClues::from_solution(&"bafts".to_owned(), &"forge".to_owned()).get_colors(), Clues([Color::BLACK, Color::BLACK, Color::YELLOW, Color::BLACK, Color::BLACK]));
-        assert_eq!(*WordClues::from_solution(&"murid".to_owned(), &"forge".to_owned()).get_colors(), Clues([Color::BLACK, Color::BLACK, Color::GREEN, Color::BLACK, Color::BLACK]));
-        assert_eq!(*WordClues::from_solution(&"soare".to_owned(), &"forge".to_owned()).get_colors(), Clues([Color::BLACK, Color::GREEN, Color::BLACK, Color::YELLOW, Color::GREEN]));
+        assert_eq!(
+            *WordClues::from_solution(&"serai".to_owned(), &"delve".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::GREEN,
+                Color::BLACK,
+                Color::BLACK,
+                Color::BLACK
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"yente".to_owned(), &"delve".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::GREEN,
+                Color::BLACK,
+                Color::BLACK,
+                Color::GREEN
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"blech".to_owned(), &"delve".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::YELLOW,
+                Color::YELLOW,
+                Color::BLACK,
+                Color::BLACK
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"begem".to_owned(), &"delve".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::GREEN,
+                Color::BLACK,
+                Color::YELLOW,
+                Color::BLACK
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"welke".to_owned(), &"delve".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::GREEN,
+                Color::GREEN,
+                Color::BLACK,
+                Color::GREEN
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"mommy".to_owned(), &"delve".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::BLACK,
+                Color::BLACK,
+                Color::BLACK,
+                Color::BLACK
+            ])
+        );
+
+        assert_eq!(
+            *WordClues::from_solution(&"forge".to_owned(), &"forge".to_owned()).get_colors(),
+            Clues([Color::GREEN; 5])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"forte".to_owned(), &"forge".to_owned()).get_colors(),
+            Clues([
+                Color::GREEN,
+                Color::GREEN,
+                Color::GREEN,
+                Color::BLACK,
+                Color::GREEN
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"forze".to_owned(), &"forge".to_owned()).get_colors(),
+            Clues([
+                Color::GREEN,
+                Color::GREEN,
+                Color::GREEN,
+                Color::BLACK,
+                Color::GREEN
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"bafts".to_owned(), &"forge".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::BLACK,
+                Color::YELLOW,
+                Color::BLACK,
+                Color::BLACK
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"murid".to_owned(), &"forge".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::BLACK,
+                Color::GREEN,
+                Color::BLACK,
+                Color::BLACK
+            ])
+        );
+        assert_eq!(
+            *WordClues::from_solution(&"soare".to_owned(), &"forge".to_owned()).get_colors(),
+            Clues([
+                Color::BLACK,
+                Color::GREEN,
+                Color::BLACK,
+                Color::YELLOW,
+                Color::GREEN
+            ])
+        );
     }
 
     #[bench]
@@ -478,9 +615,9 @@ mod tests {
     #[bench]
     fn bench_word_processor_hash_insertion(b: &mut Bencher) {
         let word = "vixon";
-        b.iter(||{
+        b.iter(|| {
             let mut map: HashMap<char, Bitmask> = HashMap::with_capacity(26);
-            word.chars().enumerate().fold(&mut map ,|acc, (idx, c)| {
+            word.chars().enumerate().fold(&mut map, |acc, (idx, c)| {
                 acc.entry(c).or_default().add(idx);
                 acc
             });
@@ -490,20 +627,17 @@ mod tests {
     #[bench]
     fn hashing_baseline(b: &mut Bencher) {
         let mut map: HashMap<char, Bitmask> = HashMap::with_capacity(0);
-        b.iter(||{
+        b.iter(|| {
             map.entry('c').or_default().add(1);
         });
     }
 
     #[bench]
     fn bench_word_suggestor(b: &mut Bencher) {
-        let word_bank = vec![
-            "abaci",
-            "ocuby",
-            "thowt",
-        ].iter()
-        .map(|&value| value.to_owned())
-        .collect::<Vec<String>>();
+        let word_bank = vec!["abaci", "ocuby", "thowt"]
+            .iter()
+            .map(|&value| value.to_owned())
+            .collect::<Vec<String>>();
 
         let word_suggestor = WordSuggestor::new(word_bank);
         b.iter(|| word_suggestor.suggest_word(LowestMaxBucketRanker::new()));
