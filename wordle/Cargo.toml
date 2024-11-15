@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+sea-orm = { version = "1.0.0-rc.5", features = ["runtime-tokio-rustls"] }
+tokio = { version = "1", features = ["full"] }
+entity = { path = "../entity" }
+indicatif = "0.17.8"
+rayon = "1.10.0"
