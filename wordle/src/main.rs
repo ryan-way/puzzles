@@ -8,7 +8,6 @@ extern crate test;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str::FromStr;
-use std::usize;
 
 use entity::prelude::*;
 use entity::word;
@@ -169,9 +168,9 @@ impl<'a> WordClues<'a> {
     }
 }
 
-impl<'a> Into<Clues> for WordClues<'a> {
-    fn into(self) -> Clues {
-        self.clues
+impl <'a> From<WordClues<'a>> for Clues {
+    fn from(value: WordClues<'a>) -> Self {
+        value.clues
     }
 }
 
@@ -203,7 +202,7 @@ impl<'a> WordSuggestor<'a> {
             .collect();
         println!("Number of possible solutions: {}", possible_solutions.len());
 
-        if possible_solutions.len() == 0 {
+        if possible_solutions.is_empty() {
             return "".to_owned();
         }
 
@@ -246,6 +245,12 @@ impl LowestMaxBucketRanker {
     }
 }
 
+impl Default for LowestMaxBucketRanker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ranker for LowestMaxBucketRanker {
     fn rank(&self, possible_solutions: &[&WordProcessor], word: &WordProcessor) -> usize {
         let mut map = HashMap::<Clues, usize>::new();
@@ -263,6 +268,12 @@ pub struct LargestUniqueValuesRanker;
 impl LargestUniqueValuesRanker {
     pub fn new() -> Self {
         LargestUniqueValuesRanker {}
+    }
+}
+
+impl Default for LargestUniqueValuesRanker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -291,7 +302,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let words: Vec<WordProcessor> = include_str!("word_bank.txt")
         .lines()
-        .map(|s| WordProcessor::new(s))
+        .map(WordProcessor::new)
         .collect();
 
     println!("created word bank");
