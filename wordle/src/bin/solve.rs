@@ -61,8 +61,7 @@ impl<'a> WordClues<'a> {
 
         let mut colors: [Color; 5] = [Color::BLACK; 5];
 
-        word
-            .chars()
+        word.chars()
             .zip(solution.chars())
             .enumerate()
             .filter(|(_, (a, b))| a == b)
@@ -114,9 +113,9 @@ impl<'a> WordSuggestor<'a> {
     where
         T: Ranker,
     {
-        // if self.word_clues.len() == 0 {
-        //     return "serai".to_owned();
-        // }
+        if self.word_clues.len() == 0 {
+            return "serai".to_owned();
+        }
         println!("Calculating possible solutions");
         let possible_solutions: Vec<&&str> = self
             .word_bank
@@ -213,9 +212,7 @@ impl Ranker for LargestUniqueValuesRanker {
     }
 }
 fn main() {
-    let words: Vec<&str> = include_str!("../word_bank.txt")
-        .lines()
-        .collect();
+    let words: Vec<&str> = include_str!("../word_bank.txt").lines().collect();
 
     println!("created word bank");
     let mut word_suggestor = WordSuggestor::new(words);
@@ -259,8 +256,7 @@ mod tests {
     #[test]
     fn test_colors() {
         assert_eq!(
-            *WordClues::from_solution("saber", "label")
-                .get_colors(),
+            *WordClues::from_solution("saber", "label").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::GREEN,
@@ -270,8 +266,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("aheap", &"woken")
-                .get_colors(),
+            *WordClues::from_solution("aheap", &"woken").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::BLACK,
@@ -282,8 +277,7 @@ mod tests {
         );
 
         assert_eq!(
-            *WordClues::from_solution("serai", &"delve")
-                .get_colors(),
+            *WordClues::from_solution("serai", &"delve").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::GREEN,
@@ -293,8 +287,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("yente", "delve")
-                .get_colors(),
+            *WordClues::from_solution("yente", "delve").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::GREEN,
@@ -304,8 +297,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("blech", "delve")
-                .get_colors(),
+            *WordClues::from_solution("blech", "delve").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::YELLOW,
@@ -315,8 +307,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("begem", "delve")
-                .get_colors(),
+            *WordClues::from_solution("begem", "delve").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::GREEN,
@@ -326,8 +317,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("welke", "delve")
-                .get_colors(),
+            *WordClues::from_solution("welke", "delve").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::GREEN,
@@ -337,8 +327,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("mommy", "delve")
-                .get_colors(),
+            *WordClues::from_solution("mommy", "delve").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::BLACK,
@@ -349,13 +338,11 @@ mod tests {
         );
 
         assert_eq!(
-            *WordClues::from_solution("forge", "forge")
-                .get_colors(),
+            *WordClues::from_solution("forge", "forge").get_colors(),
             Clues([Color::GREEN; 5])
         );
         assert_eq!(
-            *WordClues::from_solution("forte", "forge")
-                .get_colors(),
+            *WordClues::from_solution("forte", "forge").get_colors(),
             Clues([
                 Color::GREEN,
                 Color::GREEN,
@@ -365,8 +352,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("forze", "forge")
-                .get_colors(),
+            *WordClues::from_solution("forze", "forge").get_colors(),
             Clues([
                 Color::GREEN,
                 Color::GREEN,
@@ -376,8 +362,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("bafts", "forge")
-                .get_colors(),
+            *WordClues::from_solution("bafts", "forge").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::BLACK,
@@ -387,8 +372,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("murid", "forge")
-                .get_colors(),
+            *WordClues::from_solution("murid", "forge").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::BLACK,
@@ -398,8 +382,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution("soare", "forge")
-                .get_colors(),
+            *WordClues::from_solution("soare", "forge").get_colors(),
             Clues([
                 Color::BLACK,
                 Color::GREEN,
@@ -412,9 +395,7 @@ mod tests {
 
     #[bench]
     fn bench_unique_ranker(b: &mut Bencher) {
-        let words: Vec<&str> = include_str!("../word_bank.txt")
-            .lines()
-            .collect();
+        let words: Vec<&str> = include_str!("../word_bank.txt").lines().collect();
         let possible_solutions: Vec<&&str> = words.iter().collect();
         let ranker = LargestUniqueValuesRanker::new();
         b.iter(|| ranker.rank(&possible_solutions, &words[0]));
@@ -422,9 +403,7 @@ mod tests {
 
     #[bench]
     fn bench_lowest_ranker(b: &mut Bencher) {
-        let words: Vec<&str> = include_str!("../word_bank.txt")
-            .lines()
-            .collect();
+        let words: Vec<&str> = include_str!("../word_bank.txt").lines().collect();
         let possible_solutions: Vec<&&str> = words.iter().collect();
         let ranker = LowestMaxBucketRanker::new();
         b.iter(|| ranker.rank(&possible_solutions, &words[0]));
