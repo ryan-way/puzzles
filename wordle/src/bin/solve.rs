@@ -120,37 +120,34 @@ impl<'a> WordClues<'a> {
     }
 
     fn from_solution(word: &'a WordProcessor, solution: &WordProcessor) -> Self {
-        let mut map: HashMap<usize, Color> = HashMap::with_capacity(5);
-
-        word.entries().for_each(|(&key, word_set)| {
-            if let Some(solution_set) = solution.get(key) {
-                word_set
-                    .intersection(solution_set)
-                    .values()
-                    .for_each(|value| {
-                        map.insert(value, Color::GREEN);
-                    });
-
-                let max_yellows = solution_set
-                    .values()
-                    .filter(|&value| !word_set.has(value))
-                    .count();
-                let yellows: Vec<usize> = word_set
-                    .values()
-                    .filter(|value| !map.contains_key(value))
-                    .take(max_yellows)
-                    .collect();
-                yellows.iter().for_each(|&value| {
-                    map.insert(value, Color::YELLOW);
-                })
-            }
-        });
+        let mut occurrence: HashMap<char, usize> = HashMap::with_capacity(5);
+        for c in solution.word.chars() {
+            occurrence.insert(c, solution.word.chars().filter(|&a| a == c).count());
+        }
 
         let mut colors: [Color; 5] = [Color::BLACK; 5];
 
-        map.iter().for_each(|(&key, &value)| {
-            colors[key] = value;
-        });
+        word.word
+            .chars()
+            .zip(solution.word.chars())
+            .enumerate()
+            .filter(|(_, (a, b))| a == b)
+            .for_each(|(idx, (_, b))| {
+                if let Some(value) = occurrence.get(&b) {
+                    occurrence.insert(b, value - 1);
+                }
+                colors[idx] = Color::GREEN;
+            });
+
+        for (idx, c) in word.word.chars().enumerate() {
+            if let Some(value) = occurrence.get(&c) {
+                if *value > 0 && colors[idx] != Color::GREEN {
+                    occurrence.insert(c, value - 1);
+                    colors[idx] = Color::YELLOW;
+                }
+            }
+        }
+
         let clues = Clues(colors);
 
         WordClues { clues, word }
@@ -183,9 +180,9 @@ impl<'a> WordSuggestor<'a> {
     where
         T: Ranker,
     {
-        if self.word_clues.len() == 0 {
-            return "serai".to_owned();
-        }
+        // if self.word_clues.len() == 0 {
+        //     return "serai".to_owned();
+        // }
         println!("Calculating possible solutions");
         let possible_solutions: Vec<&WordProcessor> = self
             .word_bank
@@ -318,7 +315,7 @@ fn main() {
 
     println!(
         "Suggestion: {}",
-        word_suggestor.suggest_word(&LowestMaxBucketRanker::new(), true)
+        word_suggestor.suggest_word(&LargestUniqueValuesRanker::new(), true)
     );
 }
 
