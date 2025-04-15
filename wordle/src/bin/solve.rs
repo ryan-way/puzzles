@@ -1,7 +1,6 @@
 #![feature(test)]
 #![feature(iter_array_chunks)]
 
-extern crate entity;
 extern crate rayon;
 extern crate test;
 
@@ -282,8 +281,7 @@ impl Ranker for LargestUniqueValuesRanker {
             .len()
     }
 }
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let words: Vec<WordProcessor> = include_str!("../word_bank.txt")
         .lines()
         .map(WordProcessor::new)
@@ -322,8 +320,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Suggestion: {}",
         word_suggestor.suggest_word(&LowestMaxBucketRanker::new(), true)
     );
-
-    Ok(())
 }
 
 #[cfg(test)]
