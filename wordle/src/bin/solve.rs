@@ -43,48 +43,6 @@ impl FromStr for Clues {
     }
 }
 
-#[derive(Debug)]
-pub struct Bitmask(usize);
-
-impl Bitmask {
-    pub fn new() -> Self {
-        Bitmask(0)
-    }
-
-    pub fn add(&mut self, value: usize) {
-        self.0 |= 1 << value;
-    }
-
-    pub fn has(&self, value: usize) -> bool {
-        (self.0 & 1 << value) > 0
-    }
-
-    pub fn remove(&mut self, value: usize) {
-        if self.has(value) {
-            self.0 ^= 1 << value;
-        }
-    }
-
-    pub fn intersection(&self, other: &Bitmask) -> Bitmask {
-        Bitmask(self.0 & other.0)
-    }
-
-    pub fn symmetric_difference(&self, other: &Bitmask) -> Bitmask {
-        Bitmask((self.0 & other.0) ^ (self.0 | other.0))
-    }
-
-    pub fn values(&self) -> impl Iterator<Item = usize> {
-        let value = self.0;
-        (0..64).filter(move |idx| value & (1 << idx) > 0)
-    }
-}
-
-impl Default for Bitmask {
-    fn default() -> Self {
-        Bitmask::new()
-    }
-}
-
 pub struct WordClues<'a> {
     clues: Clues,
     word: &'a str,
@@ -298,113 +256,6 @@ mod tests {
     use super::*;
     use test::Bencher;
 
-    mod bitmask {
-        use super::*;
-
-        #[test]
-        fn test_init() {
-            let mask = Bitmask::new();
-            assert_eq!(mask.0, 0);
-        }
-
-        #[test]
-        fn test_add() {
-            let mut mask = Bitmask::new();
-            mask.add(0);
-            assert_eq!(mask.0, 1);
-
-            mask.add(2);
-            assert_eq!(mask.0, 5);
-        }
-
-        #[test]
-        fn test_remove() {
-            let mut mask = Bitmask::new();
-            mask.add(3);
-            assert_eq!(mask.0, 8);
-
-            mask.remove(3);
-            assert_eq!(mask.0, 0);
-        }
-
-        #[test]
-        fn test_muli_add() {
-            let mut mask = Bitmask::new();
-            mask.add(3);
-            assert_eq!(mask.0, 8);
-
-            mask.add(3);
-            assert_eq!(mask.0, 8);
-        }
-
-        #[test]
-        fn test_muli_remove() {
-            let mut mask = Bitmask::new();
-            mask.add(3);
-            assert_eq!(mask.0, 8);
-
-            mask.remove(3);
-            assert_eq!(mask.0, 0);
-
-            mask.remove(3);
-            assert_eq!(mask.0, 0);
-        }
-
-        #[test]
-        fn test_values() {
-            let mut mask = Bitmask::new();
-            mask.add(3);
-            mask.add(8);
-
-            let values: Vec<usize> = mask.values().collect();
-            println!("Values: {:?}", values);
-            assert!(values.contains(&3));
-            assert!(values.contains(&8));
-        }
-
-        #[test]
-        fn test_intersection() {
-            let mut first = Bitmask::new();
-            first.add(1);
-            first.add(2);
-            first.add(5);
-            first.add(7);
-
-            let mut second = Bitmask::new();
-            second.add(2);
-            second.add(5);
-            second.add(6);
-            second.add(8);
-
-            let intersection = first.intersection(&second);
-
-            assert!(intersection.has(2));
-            assert!(intersection.has(5));
-        }
-
-        #[test]
-        fn test_difference() {
-            let mut first = Bitmask::new();
-            first.add(1);
-            first.add(2);
-            first.add(5);
-            first.add(7);
-
-            let mut second = Bitmask::new();
-            second.add(2);
-            second.add(5);
-            second.add(6);
-            second.add(8);
-
-            let intersection = first.symmetric_difference(&second);
-
-            assert!(intersection.has(1));
-            assert!(intersection.has(6));
-            assert!(intersection.has(7));
-            assert!(intersection.has(8));
-        }
-    }
-
     #[test]
     fn test_colors() {
         assert_eq!(
@@ -585,14 +436,6 @@ mod tests {
         let second = "apple";
 
         b.iter(|| WordClues::from_solution(&first, &second));
-    }
-
-    #[bench]
-    fn hashing_baseline(b: &mut Bencher) {
-        let mut map: HashMap<char, Bitmask> = HashMap::with_capacity(0);
-        b.iter(|| {
-            map.entry('c').or_default().add(1);
-        });
     }
 
     #[bench]
