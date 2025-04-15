@@ -85,51 +85,27 @@ impl Default for Bitmask {
     }
 }
 
-pub struct WordProcessor<'a> {
-    map: HashMap<char, Bitmask>,
+pub struct WordClues<'a> {
+    clues: Clues,
     word: &'a str,
 }
 
-impl<'a> WordProcessor<'a> {
-    fn new(word: &'a str) -> Self {
-        let mut map: HashMap<char, Bitmask> = HashMap::with_capacity(26);
-        word.chars().enumerate().for_each(|(idx, c)| {
-            map.entry(c).or_default().add(idx);
-        });
-
-        WordProcessor { map, word }
-    }
-
-    fn get(&self, c: char) -> Option<&Bitmask> {
-        self.map.get(&c)
-    }
-
-    fn entries(&self) -> impl Iterator<Item = (&char, &Bitmask)> {
-        self.map.iter()
-    }
-}
-
-pub struct WordClues<'a> {
-    clues: Clues,
-    word: &'a WordProcessor<'a>,
-}
-
 impl<'a> WordClues<'a> {
-    fn from_clues(word: &'a WordProcessor, clues: Clues) -> Self {
+    fn from_clues(word: &'a str, clues: Clues) -> Self {
         WordClues { word, clues }
     }
 
-    fn from_solution(word: &'a WordProcessor, solution: &WordProcessor) -> Self {
+    fn from_solution(word: &'a str, solution: &str) -> Self {
         let mut occurrence: HashMap<char, usize> = HashMap::with_capacity(5);
-        for c in solution.word.chars() {
-            occurrence.insert(c, solution.word.chars().filter(|&a| a == c).count());
+        for c in solution.chars() {
+            occurrence.insert(c, solution.chars().filter(|&a| a == c).count());
         }
 
         let mut colors: [Color; 5] = [Color::BLACK; 5];
 
-        word.word
+        word
             .chars()
-            .zip(solution.word.chars())
+            .zip(solution.chars())
             .enumerate()
             .filter(|(_, (a, b))| a == b)
             .for_each(|(idx, (_, b))| {
@@ -139,7 +115,7 @@ impl<'a> WordClues<'a> {
                 colors[idx] = Color::GREEN;
             });
 
-        for (idx, c) in word.word.chars().enumerate() {
+        for (idx, c) in word.chars().enumerate() {
             if let Some(value) = occurrence.get(&c) {
                 if *value > 0 && colors[idx] != Color::GREEN {
                     occurrence.insert(c, value - 1);
@@ -165,12 +141,12 @@ impl<'a> From<WordClues<'a>> for Clues {
 }
 
 pub struct WordSuggestor<'a> {
-    word_bank: Vec<WordProcessor<'a>>,
+    word_bank: Vec<&'a str>,
     word_clues: Vec<&'a WordClues<'a>>,
 }
 
 impl<'a> WordSuggestor<'a> {
-    pub fn new(word_bank: Vec<WordProcessor<'a>>) -> Self {
+    pub fn new(word_bank: Vec<&'a str>) -> Self {
         WordSuggestor {
             word_bank,
             word_clues: vec![],
@@ -184,10 +160,10 @@ impl<'a> WordSuggestor<'a> {
         //     return "serai".to_owned();
         // }
         println!("Calculating possible solutions");
-        let possible_solutions: Vec<&WordProcessor> = self
+        let possible_solutions: Vec<&&str> = self
             .word_bank
             .iter()
-            .filter(|solution| {
+            .filter(|&solution| {
                 self.word_clues.iter().all(|clue| {
                     WordClues::from_solution(clue.word, solution).get_colors() == clue.get_colors()
                 })
@@ -200,7 +176,7 @@ impl<'a> WordSuggestor<'a> {
         }
 
         if possible_solutions.len() == 1 {
-            return possible_solutions.first().unwrap().word.to_owned();
+            return possible_solutions.first().unwrap().to_string();
         }
 
         println!("Calculating suggestion");
@@ -218,7 +194,7 @@ impl<'a> WordSuggestor<'a> {
             })
             .unwrap();
 
-        suggestion.word.to_owned()
+        suggestion.to_string()
     }
 
     pub fn add_clue(&mut self, word_clue: &'a WordClues<'a>) {
@@ -227,7 +203,7 @@ impl<'a> WordSuggestor<'a> {
 }
 
 pub trait Ranker: Sync + Send {
-    fn rank(&self, possible_solutions: &[&WordProcessor], word: &WordProcessor) -> usize;
+    fn rank(&self, possible_solutions: &[&&str], word: &str) -> usize;
 }
 
 pub struct LowestMaxBucketRanker;
@@ -245,7 +221,7 @@ impl Default for LowestMaxBucketRanker {
 }
 
 impl Ranker for LowestMaxBucketRanker {
-    fn rank(&self, possible_solutions: &[&WordProcessor], word: &WordProcessor) -> usize {
+    fn rank(&self, possible_solutions: &[&&str], word: &str) -> usize {
         let mut map = HashMap::<Clues, usize>::new();
         possible_solutions.iter().for_each(|solution| {
             let word_clues = WordClues::from_solution(word, solution);
@@ -270,7 +246,7 @@ impl Default for LargestUniqueValuesRanker {
 }
 
 impl Ranker for LargestUniqueValuesRanker {
-    fn rank(&self, possible_solutions: &[&WordProcessor], word: &WordProcessor) -> usize {
+    fn rank(&self, possible_solutions: &[&&str], word: &str) -> usize {
         possible_solutions
             .iter()
             .map(|solution| WordClues::from_solution(word, solution).into())
@@ -279,19 +255,17 @@ impl Ranker for LargestUniqueValuesRanker {
     }
 }
 fn main() {
-    let words: Vec<WordProcessor> = include_str!("../word_bank.txt")
+    let words: Vec<&str> = include_str!("../word_bank.txt")
         .lines()
-        .map(WordProcessor::new)
         .collect();
 
     println!("created word bank");
     let mut word_suggestor = WordSuggestor::new(words);
-    let processors: Vec<WordProcessor> = include_str!("../clues.txt")
+    let processors: Vec<&str> = include_str!("../clues.txt")
         .lines()
         .map(|s| {
             let mut split = s.split(" ");
-            let word = split.next().unwrap();
-            WordProcessor::new(word)
+            split.next().unwrap()
         })
         .collect();
     let clues: Vec<Clues> = include_str!("../clues.txt")
@@ -434,7 +408,7 @@ mod tests {
     #[test]
     fn test_colors() {
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"saber"), &WordProcessor::new("label"))
+            *WordClues::from_solution("saber", "label")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -445,7 +419,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"aheap"), &WordProcessor::new(&"woken"))
+            *WordClues::from_solution("aheap", &"woken")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -457,7 +431,7 @@ mod tests {
         );
 
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"serai"), &WordProcessor::new(&"delve"))
+            *WordClues::from_solution("serai", &"delve")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -468,7 +442,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"yente"), &WordProcessor::new(&"delve"))
+            *WordClues::from_solution("yente", "delve")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -479,7 +453,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"blech"), &WordProcessor::new(&"delve"))
+            *WordClues::from_solution("blech", "delve")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -490,7 +464,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"begem"), &WordProcessor::new(&"delve"))
+            *WordClues::from_solution("begem", "delve")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -501,7 +475,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"welke"), &WordProcessor::new(&"delve"))
+            *WordClues::from_solution("welke", "delve")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -512,7 +486,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"mommy"), &WordProcessor::new(&"delve"))
+            *WordClues::from_solution("mommy", "delve")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -524,12 +498,12 @@ mod tests {
         );
 
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"forge"), &WordProcessor::new(&"forge"))
+            *WordClues::from_solution("forge", "forge")
                 .get_colors(),
             Clues([Color::GREEN; 5])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"forte"), &WordProcessor::new(&"forge"))
+            *WordClues::from_solution("forte", "forge")
                 .get_colors(),
             Clues([
                 Color::GREEN,
@@ -540,7 +514,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"forze"), &WordProcessor::new(&"forge"))
+            *WordClues::from_solution("forze", "forge")
                 .get_colors(),
             Clues([
                 Color::GREEN,
@@ -551,7 +525,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"bafts"), &WordProcessor::new(&"forge"))
+            *WordClues::from_solution("bafts", "forge")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -562,7 +536,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"murid"), &WordProcessor::new(&"forge"))
+            *WordClues::from_solution("murid", "forge")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -573,7 +547,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            *WordClues::from_solution(&WordProcessor::new(&"soare"), &WordProcessor::new(&"forge"))
+            *WordClues::from_solution("soare", "forge")
                 .get_colors(),
             Clues([
                 Color::BLACK,
@@ -587,51 +561,30 @@ mod tests {
 
     #[bench]
     fn bench_unique_ranker(b: &mut Bencher) {
-        let words: Vec<WordProcessor> = include_str!("../word_bank.txt")
+        let words: Vec<&str> = include_str!("../word_bank.txt")
             .lines()
-            .map(|s| WordProcessor::new(s))
             .collect();
-        let possible_solutions: Vec<&WordProcessor> = words.iter().collect();
+        let possible_solutions: Vec<&&str> = words.iter().collect();
         let ranker = LargestUniqueValuesRanker::new();
         b.iter(|| ranker.rank(&possible_solutions, &words[0]));
     }
 
     #[bench]
     fn bench_lowest_ranker(b: &mut Bencher) {
-        let words: Vec<WordProcessor> = include_str!("../word_bank.txt")
+        let words: Vec<&str> = include_str!("../word_bank.txt")
             .lines()
-            .map(|s| WordProcessor::new(s))
             .collect();
-        let possible_solutions: Vec<&WordProcessor> = words.iter().collect();
+        let possible_solutions: Vec<&&str> = words.iter().collect();
         let ranker = LowestMaxBucketRanker::new();
         b.iter(|| ranker.rank(&possible_solutions, &words[0]));
     }
 
     #[bench]
     fn bench_clue_creation(b: &mut Bencher) {
-        let first = WordProcessor::new("vixon");
-        let second = WordProcessor::new("apple");
+        let first = "vixon";
+        let second = "apple";
 
         b.iter(|| WordClues::from_solution(&first, &second));
-    }
-
-    #[bench]
-    fn bench_word_processor(b: &mut Bencher) {
-        let word = "vixon";
-
-        b.iter(|| WordProcessor::new(word));
-    }
-
-    #[bench]
-    fn bench_word_processor_hash_insertion(b: &mut Bencher) {
-        let word = "vixon";
-        b.iter(|| {
-            let mut map: HashMap<char, Bitmask> = HashMap::with_capacity(26);
-            word.chars().enumerate().fold(&mut map, |acc, (idx, c)| {
-                acc.entry(c).or_default().add(idx);
-                acc
-            });
-        });
     }
 
     #[bench]
@@ -644,10 +597,7 @@ mod tests {
 
     #[bench]
     fn bench_filter_word_bank(b: &mut Bencher) {
-        let word_bank: Vec<WordProcessor> = vec!["abaci", "ocuby", "thowt"]
-            .into_iter()
-            .map(|s| WordProcessor::new(s))
-            .collect();
+        let word_bank: Vec<&str> = vec!["abaci", "ocuby", "thowt"];
         let word_clues: Vec<WordClues> = vec![];
 
         b.iter(|| {
@@ -659,16 +609,13 @@ mod tests {
                             == clue.get_colors()
                     })
                 })
-                .collect::<Vec<&WordProcessor>>()
+                .collect::<Vec<&&str>>()
         });
     }
 
     #[bench]
     fn bench_word_suggestor(b: &mut Bencher) {
-        let word_bank: Vec<WordProcessor> = vec!["abaci", "ocuby", "thowt"]
-            .into_iter()
-            .map(|s| WordProcessor::new(s))
-            .collect();
+        let word_bank: Vec<&str> = vec!["abaci", "ocuby", "thowt"];
 
         let word_suggestor = WordSuggestor::new(word_bank);
         let ranker = LowestMaxBucketRanker::new();
